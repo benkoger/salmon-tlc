@@ -42,8 +42,8 @@ def crossing_times(tag, line, leftright):
             times (list): list of frame count number to give times that fish crossed line
     '''
     times = []
-    for time in tag.keys():
-        if time+1 in tag.keys():
+    for time in tag:
+        if time+1 in tag:
             if leftright == True:
                 if tag[time] < line:
                     if tag[time+1] >= line:
@@ -84,18 +84,18 @@ def file_fish_cross(tracks, line):
     '''
     lr = {}
     rl = {}
-    for file in tracks.keys():
-        for tag in tracks[file].keys():
+    for file in tracks:
+        for tag in tracks[file]:
             lr_crossing = crossing_times(
                 tracks[file][tag], line=line, leftright=True)
             if lr_crossing:
-                if file not in lr.keys():
+                if file not in lr:
                     lr[file] = {}
                 lr[file][tag] = lr_crossing
             rl_crossing = crossing_times(
                 tracks[file][tag], line=line, leftright=False)
             if rl_crossing:
-                if file not in rl.keys():
+                if file not in rl:
                     rl[file] = {}
                 rl[file][tag] = rl_crossing
     return lr, rl
