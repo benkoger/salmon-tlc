@@ -165,23 +165,24 @@ def norm_groups(direction_data, tracks, proximity):
             continue
         for tag, times in file_data.items():
             for time in times:
+                tag_loc = tracks[file][tag][time]
                 for fish in file_data:
                     if fish == tag:
                         continue
-                    if time in tracks[file][fish]:
-                        diff = np.linalg.norm(
-                            np.array(tracks[file][tag][time])
-                            - np.array(tracks[file][fish][time])
-                        )
-                        if diff < proximity:
-                            if tag not in fish_list:
-                                if fish not in fish_list:
-                                    groups.append([tag, fish])
-                                    fish_list.append(tag)
-                                    fish_list.append(fish)
-                                else:
-                                    for i in range(len(groups)):
-                                        if fish in groups[i]:
-                                            groups[i].append(tag)
-                                            fish_list.append(tag)
+                    if time not in tracks[file][fish]:
+                        continue
+                    diff = np.linalg.norm(
+                        np.array(tag_loc) - np.array(tracks[file][fish][time])
+                    )
+                    if diff < proximity:
+                        if tag not in fish_list:
+                            if fish not in fish_list:
+                                groups.append([tag, fish])
+                                fish_list.append(tag)
+                                fish_list.append(fish)
+                            else:
+                                for i in range(len(groups)):
+                                    if fish in groups[i]:
+                                        groups[i].append(tag)
+                                        fish_list.append(tag)
     return groups
