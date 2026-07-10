@@ -1,5 +1,6 @@
 from dbscan1d.core import DBSCAN1D
 import numpy as np
+import pickle
 from collections import defaultdict
 
 
@@ -34,6 +35,32 @@ def fish_mid(tracks):
     return tracks
 
 
+def fish_mid_no_file(tracks):
+    """
+    Adaptation of the midpoint function for tracks with no file distinction. Gives tracks with x and y midpoints for each bounding box instead of the location and size
+
+        Args:
+            tracks (dict): gives fish tag with corresponding time stamps and locations of bounding boxes
+                keys: tag number for fish
+                values (dict): gives the time stamps with corresponding location and size of bounding boxes
+                    keys: time stamps (total seconds)
+                    values (numpy array): top left coordinate of bounding box (x,y) followed by the width and height of the box
+        Returns:
+            tracks (dict): same format as argument, but the values for the box location are the x and y midpoints of the bounding box.
+                keys: tag number for fish
+                values (dict): gives the time stamps with corresponding locations of bounding boxes
+                    keys: time stamps (total seconds)
+                    values (list): x midpoint and y midpoint of the bounding box
+    """
+    for tag, times_data in tracks.items():
+        for time, box_loc in times_data.items():
+            if len(box_loc) == 4:
+                x_min, y_min, width, height = box_loc
+                x_mid, y_mid = x_min + width / 2, y_min + height / 2
+                tracks[tag][time] = [x_mid, y_mid]
+    return tracks
+
+
 def crossing_times(file_data, line, leftright):
     """
     Returns the crossing time for a specified fish
@@ -45,6 +72,7 @@ def crossing_times(file_data, line, leftright):
                     keys: time (frame number)
                     values (list): list of x and y midpoint values for the bounding box of the fish
             line (int): x-value of vertical line to check crossing
+            leftright (bool): determines if consider left to right or right to left crossing
         Returns:
             times (dict): for each fish gives frame count number for when the fish crossed the line
                 keys: fish tag number
@@ -52,16 +80,19 @@ def crossing_times(file_data, line, leftright):
     """
     times = defaultdict(list)
     for tag, tag_data in file_data.items():
-        for time, loc in tag_data.items():
-            if time + 1 in tag_data:
+        time_list = list(tag_data)
+        # for time, loc in tag_data.items():
+        for i, loc in enumerate(tag_data.values()):
+            if i < len(time_list) - 1:
+                # if time + 1 in tag_data: #maybe if time != max(tag_data):
                 if leftright:
                     if loc[0] < line:
-                        if tag_data[time + 1][0] >= line:
-                            times[tag].append(time)
+                        if tag_data[time_list[i + 1]][0] >= line:
+                            times[tag].append(time_list[i])
                 else:
                     if loc[0] >= line:
-                        if tag_data[time + 1][0] < line:
-                            times[tag].append(time)
+                        if tag_data[time_list[i + 1]][0] < line:
+                            times[tag].append(time_list[i])
     return dict(times)
 
 
@@ -103,9 +134,9 @@ def file_fish_cross(tracks, line):
     return lr, rl
 
 
-def dbscan_dist(direction_data, proximity):
+def dbscan_time_groups(direction_data, proximity, min_size=2):
     """
-    Uses DBSCAN1 to get fish groups of given direction data with specified proximity
+    Uses DBSCAN1D to get fish groups of given direction data with specified proximity
 
         Args:
             direction_data (dict): fish tags with their respective crossing times for an entire day
@@ -122,7 +153,7 @@ def dbscan_dist(direction_data, proximity):
             fishes.append(fish)
             all_times.append(time)
     all_times = np.array(all_times)
-    dbs = DBSCAN1D(eps=proximity, min_samples=2)
+    dbs = DBSCAN1D(eps=proximity, min_samples=min_size)
     labels = dbs.fit_predict(all_times)
     groups = []
     for label in set(l for l in labels if l != -1):
@@ -186,3 +217,26 @@ def norm_groups(direction_data, tracks, proximity):
                                         groups[i].append(tag)
                                         fish_list.append(tag)
     return groups
+
+
+def tracks_crossing_info(tracks_file, line):
+    """
+    Uses the crossing_times function to get the crossing info for the specific tracks
+
+        Args:
+            tracks_file: directory location of the specific tracks file
+            line (int): location of the vertical line to determine crossing
+        Returns:
+            rl (dict): gives the crossing times for each tag that crosses
+                keys (int): tag number of fish
+                values (list): list of respective crossing_times
+    """
+    tracks = pickle.load(open(tracks_file, "rb"))
+    lr = crossing_times(tracks, 1250, True)
+    rl = crossing_times(tracks, 1250, False)
+    for tag, lr_times in lr.items():
+        if tag in rl:
+            rl_times = rl[tag]
+            if min(lr_times) < min(rl_times) and max(lr_times) > max(rl_times):
+                rl.pop(tag)
+    return rl
