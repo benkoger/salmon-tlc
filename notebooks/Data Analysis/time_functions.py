@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import os
 import pickle
 
+import matplotlib.pyplot as plt
+
 reader = easyocr.Reader(["en"])
 
 
@@ -22,7 +24,7 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
             output (list): list of times in seconds, with index + 1 corresponding to the frame number
     """
     vid_split = video_file.split("/")
-    file_dir = f"/project/uwyo-0003/salmon-tlc/processing/time-stamp-extraction_6-17-2026/{vid_split[5]}/{vid_split[7]}"
+    file_dir = f"/project/uwyo-0003/salmon-tlc/processing/time-stamp-extraction_07-08-2026/{vid_split[5]}/{vid_split[7]}"
     file_path = os.path.join(file_dir, f"{vid_split[-1][:-4]}-extracted_times.pkl")
     if os.path.exists(file_path):
         return
@@ -35,19 +37,19 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
     }
     output = []
     frame_count = 0
-    vid_split2 = video_file.split("_")
-    if vid_split2[2][3:] in crop_dict:
-        x_s = crop_dict[vid_split2[2][3:]]
+    vid_split2 = vid_split[-1].split("_")
+    if vid_split2[1][3:] in crop_dict:
+        x_s = crop_dict[vid_split2[1][3:]]
     else:
         x_s = [1441, 1525]  # used to be 1442, 1524
     one_sec = timedelta(seconds=1)
     start = datetime(
         2025,
         8,
-        int(vid_split2[2][9:11]),
-        int(vid_split2[3][:2]),
-        int(vid_split2[3][2:4]),
-        int(vid_split2[3][4:]),
+        int(vid_split2[1][9:]),
+        int(vid_split2[2][:2]),
+        int(vid_split2[2][2:4]),
+        int(vid_split2[2][4:]),
     )
 
     fvs = FileVideoStream(video_file).start()
@@ -70,8 +72,8 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
             second = reader.readtext(
                 frame, allowlist="0123456789", text_threshold=0.4, low_text=0.3
             )
-            if second and second[0][2] > 0.9 and 0 <= int(second[0][1]) <= 59:
-                if int(second[0][1]) == (int(vid_split2[3][4:]) + 1) % 60:
+            if second and second[0][2] > 0.95 and 0 <= int(second[0][1]) <= 59:
+                if int(second[0][1]) == (int(vid_split2[2][4:]) + 1) % 60:
                     time = start + one_sec
                     output.append(3600 * time.hour + 60 * time.minute + time.second)
                     old_frame = frame
@@ -83,7 +85,7 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
             detect = False
             continue
         # Make sure frames of first five time stamps are "mostly" correct values
-        for i in range(3, 6):
+        for i in range(3, 8):
             if len(set(output)) == i and output[-2] != output[-1]:
                 if output[-2] != output[-14] and len(output) >= 17:
                     for j in range(i - 2):
@@ -104,7 +106,6 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
             diff = cv2.absdiff(frame, old_frame)
             sim_score = (diff > 10).mean()
             if sim_score < 0.00007:  # used to be 0.00005
-                # print("no ocr", time)
                 output.append(3600 * time.hour + 60 * time.minute + time.second)
                 old_frame = frame
                 continue
@@ -113,26 +114,20 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
         second = reader.readtext(
             frame, allowlist=secs, text_threshold=0.4, low_text=0.3
         )
-        if second and second[0][2] > 0.75:  # changed from 0.9
+        if second and second[0][2] > 0.75:  # changed from 0.9 to 0.75
             detect = True
             if second[0][1] == secs[2:]:
                 time += one_sec
-                # if frame_count >= 9:
-                #     if output[-1] == output[-8]:
-                #         time += one_sec
-                # else:
-                #     time += one_sec
-
-        # elif len(output) >= 20 and output[-1] == output[-20]:
-
-        # elif not second or second[0][1] != secs[:2]:
         else:
             detect = False
             if frame_count >= 16:
 
                 if output[-1] == output[-15]:
                     time += one_sec
-        output.append(3600 * time.hour + 60 * time.minute + time.second)
+        if time.hour == 0 and time.minute == 0 and time.second == 0:
+            output.append(86400)
+        else:
+            output.append(3600 * time.hour + 60 * time.minute + time.second)
         old_frame = frame
 
     sorted_out = sorted(set(output))
@@ -224,101 +219,3 @@ def track_time_conversion(track, times, max_tag):
         new_track[new_tag] = new_vals
     max_tag = max(new_tags) + 1
     return new_track, max_tag
-
-
-# def time_replace(direction_data_file, output):
-#     """
-#     Replaces frame number with corresponding time value in seconds
-
-#         Args:
-#             direction_data_file (dict): gives list of crossing times for each fish that crossed the line
-#                 As returned for each file from file_fish_cross function
-#                 keys: fish tag number
-#                 values (list): list of frame number for crossing times
-#             output (list): list of time stamps in seconds for the file
-#                 As returned by time_converter() function where the index equals the frame count - 1
-#         Returns:
-#             new_data (dict): same structure as direction_data_file but with time values in seconds
-#     """
-#     new_data = {}
-#     for tag, times in direction_data_file.items():
-#         new_data[tag] = []
-#         for time in times:
-#             if output[time - 1] not in new_data[tag]:
-#                 stamp = output[time - 1]
-#                 new_data[tag].append(
-#                     3600 * stamp.hour + 60 * stamp.minute + stamp.second
-#                 )
-#     return new_data
-
-
-# def direction_time_replace(lr, rl, video_files, x_fac, y_fac):
-#     """
-#     Uses time_replace function for all files in the crossing data
-
-#         Args:
-#             lr (dict): gives files where fish crossed the line left to right
-#                 As returned from file_fish_cross fuction
-#                 keys: file number
-#                 values (dict): fish tag number and respective crossing times
-#                     keys: fish tag number
-#                     values: list of crossing times
-#             rl (dict): gives files where fish crossed the line right to left
-#                 As returned from file_fish_cross function
-#                 keys: file number
-#                 values (dict): fish tag number and respective crossing times
-#                     keys: fish tag number
-#                     values: list of crossing times
-#             video_files (list): video files corresponding to the tracks
-#             x_fac (int): scale factor for x-axis of image
-#             y_fac (int): scale factor for y-axis of image
-#         Returns:
-#             lr (dict): same structure as parameter but with times in seconds
-#             rl (dict): same structure as parameter but with times in seconds
-#     """
-#     file_list = []
-#     for file in lr:
-#         file_list.append(file)
-#         output = time_converter(video_files[file], x_fac, y_fac)
-#         lr[file] = time_replace(lr[file], output)
-#         if file in rl:
-#             rl[file] = time_replace(rl[file], output)
-#     for file in rl:
-#         if file in file_list:
-#             continue
-#         file_list.append(file)
-#         output = time_converter(video_files[file], x_fac, y_fac)
-#         rl[file] = time_replace(rl[file], output)
-#     return lr, rl
-
-
-# def full_day(lr, rl):
-#     """
-#     Combines direction data from all of the files for a day
-
-#         Args:
-#             lr (dict): gives fish and their crossing times from left to right in seconds for each file with a fish that crosses the line
-#                 keys: file number
-#                 values (dict): gives fish tag and its crossing times
-#                     keys: fish tag number
-#                     values (list): list of crossing times in seconds
-#             rl (dict): gives fish and their crossing times from right to left in seconds for each file containing a fish that crosses the line
-#                 keys: file number
-#                 values: fish tag with its crossing times
-#                     keys: fish tag number
-#                     values: list of crossing times in seconds
-#         Returns:
-#             full_lr (dict): fish with their respective crossing times in seconds
-#                 keys: fish tag number
-#                 values: list of crossing times in seconds
-#             full_rl (dict): fish with their respective crossing times in seconds
-#                 keys: fish tag number
-#                 values: list of crossing times in seconds
-#     """
-#     full_lr = {}
-#     full_rl = {}
-#     for file_data in lr.values():
-#         full_lr.update(file_data)
-#     for file_data in rl.values():
-#         full_rl.update(file_data)
-#     return full_lr, full_rl
