@@ -30,7 +30,7 @@ def make_full_figure(
             plots a figure comparing the data sets
     """
     names = ["empirical_data", "asocial model", "social model"]
-    colors = ["tab:blue", "tab:orange", "#009E73"]
+    colors = ["tab:blue", "#009E73", "tab:orange"]
     fig = plt.figure(figsize=(15, 10))
 
     all_fracs = []
@@ -160,7 +160,7 @@ def plots_d_e(time_step, alpha, gamma, iterations, save, num_bins=15, scatter=Fa
             plots a figure with two supblots, one for plot d (the PDFs) and one for plot e (SD over time)
     """
     t_vals = np.linspace(15, 24, int(9 * 3600 / time_step) + 1)
-    colors = ["tab:blue", "tab:orange", "#009E73"]
+    colors = ["tab:blue", "#009E73", "tab:orange"]
     names = ["empirical_data", "asocial_model", "social_model"]
     range_index = round(0.05 * iterations / 2)
     fig = plt.figure(figsize=(10, 5))
@@ -268,7 +268,7 @@ def old_make_full_figure(t_vals, empirical_data, asocial_data, social_data, tota
             figure with 6 total subplots in 2 rows and three columns
     """
     names = ["empirical data", "asocial model", "social model"]
-    colors = ["tab:blue", "tab:orange", "#009E73"]
+    colors = ["tab:blue", "#009E73", "tab:orange"]
     fig = plt.figure(figsize=(15, 10))
 
     all_fracs = []
