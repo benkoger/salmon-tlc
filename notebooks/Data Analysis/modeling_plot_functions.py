@@ -30,7 +30,7 @@ def make_full_figure(
             plots a figure comparing the data sets
     """
     names = ["empirical_data", "asocial model", "social model"]
-    colors = ["blue", "red", "green"]
+    colors = ["tab:blue", "tab:orange", "#009E73"]
     fig = plt.figure(figsize=(15, 10))
 
     all_fracs = []
@@ -51,7 +51,7 @@ def make_full_figure(
 
     ax = fig.add_subplot(2, 3, 4)
     full_fracs = [frac for fracs in all_fracs for frac in fracs]
-    bins = np.linspace(0, max(full_fracs), 10)
+    bins = np.linspace(0, max(full_fracs), 15)
     for i, fracs in enumerate(all_fracs):
         heights, edges = np.histogram(fracs, bins=bins, density=True)
         centers = (edges[:-1] + edges[1:]) / 2
@@ -100,7 +100,7 @@ def make_full_figure(
                 ci["mean_ci_lower"],
                 ci["mean_ci_upper"],
                 color=colors[i],
-                alpha=0.3,
+                alpha=0.15,
             )
         points = np.array(points)
         ax.scatter(points[:, 0], points[:, 1], color=colors[i], label=names[i])
@@ -160,7 +160,7 @@ def plots_d_e(time_step, alpha, gamma, iterations, save, num_bins=15, scatter=Fa
             plots a figure with two supblots, one for plot d (the PDFs) and one for plot e (SD over time)
     """
     t_vals = np.linspace(15, 24, int(9 * 3600 / time_step) + 1)
-    colors = ["blue", "orange", "green"]
+    colors = ["tab:blue", "tab:orange", "#009E73"]
     names = ["empirical_data", "asocial_model", "social_model"]
     range_index = round(0.05 * iterations / 2)
     fig = plt.figure(figsize=(10, 5))
@@ -203,10 +203,6 @@ def plots_d_e(time_step, alpha, gamma, iterations, save, num_bins=15, scatter=Fa
     max_frac = max([max(emp_fracs), asoc_max, soc_max])
     bins = np.linspace(0, max_frac, 15)
 
-    heights, edges = np.histogram(emp_fracs, bins=bins, density=True)
-    centers = (edges[:-1] + edges[1:]) / 2
-    ax.semilogy(centers, heights, color=colors[0], label=names[0])
-
     for i, model_fracs in enumerate([asocial_fracs, social_fracs]):
         x_vals, y_vals = [], []
         for fracs in model_fracs:
@@ -223,13 +219,15 @@ def plots_d_e(time_step, alpha, gamma, iterations, save, num_bins=15, scatter=Fa
         lower = [vals[range_index] for vals in new_vals]
         upper = [vals[-range_index] for vals in new_vals]
         ax.semilogy(x_vals, med_y_vals, color=colors[i + 1], label=names[i + 1])
-        ax.fill_between(x_vals, lower, upper, color=colors[i + 1], alpha=0.3)
+        ax.fill_between(x_vals, lower, upper, color=colors[i + 1], alpha=0.15)
+    heights, edges = np.histogram(emp_fracs, bins=bins, density=True)
+    centers = (edges[:-1] + edges[1:]) / 2
+    ax.semilogy(centers, heights, color=colors[0], label=names[0])
     ax.legend()
     ax.set_xlabel("Fraction of daily run arriving per time step")
     ax.set_ylabel("PDF")
 
     ax = fig.add_subplot(122)
-    ax.plot(t_vals, emp_y_vals, color=colors[0], label=names[0])
     for i, y_vals in enumerate([asocial_y_vals, social_y_vals]):
         med_vals = np.median(y_vals, axis=0)
         new_vals = [[] for _ in range(len(y_vals[0]))]
@@ -240,7 +238,8 @@ def plots_d_e(time_step, alpha, gamma, iterations, save, num_bins=15, scatter=Fa
         lower = [vals[range_index] for vals in new_vals]
         upper = [vals[-range_index] for vals in new_vals]
         ax.plot(t_vals, med_vals, color=colors[i + 1], label=names[i + 1])
-        ax.fill_between(t_vals, lower, upper, color=colors[i + 1], alpha=0.3)
+        ax.fill_between(t_vals, lower, upper, color=colors[i + 1], alpha=0.15)
+    ax.plot(t_vals, emp_y_vals, color=colors[0], label=names[0])
     ax.legend()
     ax.set_xlabel("Time (hours)")
     ax.set_ylabel("SD (cummulative fraction arrived)")
@@ -269,7 +268,7 @@ def old_make_full_figure(t_vals, empirical_data, asocial_data, social_data, tota
             figure with 6 total subplots in 2 rows and three columns
     """
     names = ["empirical data", "asocial model", "social model"]
-    colors = ["blue", "red", "green"]
+    colors = ["tab:blue", "tab:orange", "#009E73"]
     fig = plt.figure(figsize=(15, 10))
 
     all_fracs = []
@@ -347,7 +346,7 @@ def old_make_full_figure(t_vals, empirical_data, asocial_data, social_data, tota
                 ci["mean_ci_lower"],
                 ci["mean_ci_upper"],
                 color=colors[i],
-                alpha=0.3,
+                alpha=0.15,
             )
         points = np.array(points)
         ax.scatter(points[:, 0], points[:, 1], color=colors[i], label=names[i])

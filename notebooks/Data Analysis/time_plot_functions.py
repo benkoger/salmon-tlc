@@ -63,7 +63,7 @@ def closest_all_fish_distances(
         close_dists = np.array(close_dists)
         if xlog:
             _, bins = np.histogram(close_dists[close_dists > 0], bins=num_bins)
-            bins = np.logspace(np.log10(bins[0]), np.log10[-1], len(bins))
+            bins = np.logspace(np.log10(bins[0]), np.log10(bins[-1]), len(bins))
             ax.hist(close_dists[close_dists > 0], bins=bins)
         else:
             ax.hist(close_dists[close_dists <= max_time], bins=num_bins)
@@ -104,7 +104,7 @@ def interfish_time_dist_plot(xlog, ylog, altogether, save, line=1250):
     """
     xscale = "log" if xlog else "linear"
     yscale = "log" if ylog else "linear"
-    fig = plt.figure(figsize=(25, 15))
+    fig = plt.figure(figsize=(15, 8))
     full_distances = []
     for i, cam in enumerate(cam_names):
         folder = f"/project/uwyo-0003/salmon-tlc/processing/tracks-with-true-times_06-18-2026/{cam}"
@@ -208,8 +208,15 @@ def fish_group_distr_hist(
             cam_sizes, bins=bins, weights=np.ones(len(cam_sizes)) / len(cam_sizes)
         )
         all_counts.append(counts)
+    colors = ["tab:blue", "tab:orange", "#009E73"]
     for i, counts in enumerate(all_counts):
-        plt.bar(x + (i - 1) * width, counts, width=width, label=f"{cam_names[i]}")
+        plt.bar(
+            x + (i - 1) * width,
+            counts,
+            width=width,
+            label=f"{cam_names[i]}",
+            color=colors[i],
+        )
     start = "Probability distribution" if probability else "Histogram"
     then = "for individual fish" if weighted_groups else "for group sizes"
     plt.title(f"{start} {then} across cameras")
@@ -273,7 +280,7 @@ def make_lollipop_plots(proximity, save, total_plot=False, line=1250):
                     single_times[:, 0],
                     single_times[:, 1],
                     basefmt=" ",
-                    linefmt="orange",
+                    linefmt="tab:orange",
                     markerfmt="Dr",
                 )
             ax.set_xlim(15, 24)
@@ -332,7 +339,7 @@ def gaussian_distr_check(save, line=1250, new_mid=18.5):
             f = interp1d(all_times, total_fish, bounds_error=False, fill_value=(0, 1))
             y.append(f(x_vals))
     y_vals = np.nanmean(y, axis=0)
-    plt.plot(x_vals, y_vals, color="blue", label="average")
+    plt.plot(x_vals, y_vals, color="tab:blue", label="average")
 
     avg, std_dev = new_mid, np.mean(stds)
     a, b = (15 - avg) / std_dev, (24 - avg) / std_dev
@@ -340,7 +347,7 @@ def gaussian_distr_check(save, line=1250, new_mid=18.5):
     plt.plot(
         x_vals,
         stats.truncnorm.cdf(x_vals, a=a, b=b, loc=avg, scale=std_dev),
-        color="orange",
+        color="tab:orange",
         label=rf"Gaussian distribution, $\sigma$={round(std_dev, 3)}",
     )
     plt.legend()
