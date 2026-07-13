@@ -182,9 +182,37 @@ def get_times_folder(date, cam_name):
             date (str): date of the year in the format YYYYMMDD
             cam_name (str): name of camerca in the format "cam##-{name}"
         Returns:
-            folder (str): directory location of the tracks folder for the date and camera name
+            folder (str): directory location of the times folder for the date and camera name
     """
-    folder = f"/project/uwyo-0003/salmon-tlc/processing/time-stamp-extraction_6-17-2026/{cam_name}/{date[:4]}-{date[4:6]}-{date[6:]}"
+    folder = f"/project/uwyo-0003/salmon-tlc/processing/time-stamp-extraction_06-17-2026/{cam_name}/{date[:4]}-{date[4:6]}-{date[6:]}"
+    return folder
+
+
+def get_tracks_folder2(date, cam_name):
+    """
+    Returns the directory location of the tracks folder for the specified date and camera name with the new run of cameras from 06/28
+
+        Args:
+            date (str): date of the year in the format YYYYMMDD
+            cam_name (str): name of camera in the format "cam##-{name}"
+        Returns:
+            folder (str):directoy location of the tracks folder for the date and camera name
+    """
+    folder = f"/project/uwyo-0003/salmon-tlc/processing/model-06-28-2026-14-56-28/{cam_name}/{date[:4]}-{date[4:6]}-{date[6:]}"
+    return folder
+
+
+def get_times_folder2(date, cam_name):
+    """
+    Returns the directory location of the time info folder for the specified date and camera based on the run from 07/09/2026
+
+        Args:
+            date (str): date of the year in the format YYYYMMDD
+            cam_name (str): name of camera in the format "cam##-{name}"
+        Returns:
+            folder (str): directory location of the times folder for the date and camera name
+    """
+    folder = f"/project/uwyo-0003/salmon-tlc/processing/time-stamp-extraction_07-08-2026/{cam_name}/{date[:4]}-{date[4:6]}-{date[6:]}"
     return folder
 
 
