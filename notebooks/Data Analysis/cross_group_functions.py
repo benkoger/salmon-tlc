@@ -219,24 +219,30 @@ def norm_groups(direction_data, tracks, proximity):
     return groups
 
 
-def tracks_crossing_info(tracks_file, line):
+def tracks_crossing_info(tracks_file, line, leftright):
     """
     Uses the crossing_times function to get the crossing info for the specific tracks
 
         Args:
             tracks_file: directory location of the specific tracks file
             line (int): location of the vertical line to determine crossing
+            leftright (bool): denotes whether upstream is left to right or right to left. If True, upstream is left to right. If False, upstream is right to left
         Returns:
-            rl (dict): gives the crossing times for each tag that crosses
+            lr or rl (dict): gives the crossing times for each tag that crosses
                 keys (int): tag number of fish
                 values (list): list of respective crossing_times
     """
     tracks = pickle.load(open(tracks_file, "rb"))
     lr = crossing_times(tracks, 1250, True)
     rl = crossing_times(tracks, 1250, False)
+    pop_lr = []
     for tag, lr_times in lr.items():
         if tag in rl:
             rl_times = rl[tag]
             if min(lr_times) < min(rl_times) and max(lr_times) > max(rl_times):
                 rl.pop(tag)
-    return rl
+            elif min(lr_times) > min(rl_times) and max(lr_times) < max(rl_times):
+                pop_lr.append(tag)
+    for tag in pop_lr:
+        lr.pop(tag)
+    return lr if leftright else rl
