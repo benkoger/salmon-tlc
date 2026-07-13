@@ -15,6 +15,20 @@ import numpy as np
 def make_full_figure_new(
     step_size, alpha, gamma, save, line=1250, new_mid=18.5, iterations=1000
 ):
+    """
+    Plots a figure comparing the empirical, asocial, and social models using the functions from modeling_functions.py. The 4th and 5th subplots are in the same form as the plots_d_e function below.
+
+        Args:
+            step_size (float): nmber of seconds per time step
+            alpha (float): probability of a fish leaving the staging pond
+            gamma (float): probability of a fish following a fish that has left
+            save (bool): if True, the figure will be saved in the working directory
+            line (int): x-value of the vertical line used to measure crossing
+            new_mid (float): time location (hours) of the middle of the centered data
+            iterations (int): number of times to repeat the models for the fourth and fifth plots
+        Returns:
+            Plots a figure with 6 subplots in the same form as the plot from the 2017 paper by Andrew Berdahl
+    """
     t_vals = np.linspace(15, 24, int(9 * 3600 / step_size) + 1)
     fig = plt.figure(figsize=(15, 10))
     empirical_data = empirical_data_return(t_vals, line, new_mid)
