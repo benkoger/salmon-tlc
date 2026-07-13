@@ -7,10 +7,10 @@ import numpy as np
 import statsmodels.api as sm
 from scipy import stats
 
-from cross_group_functions import crossing_times
+from cross_group_functions import tracks_crossing_info
 
 
-def gauss_prob(x, avg=18.5, sigma=1.216, min_time=15, max_time=24):
+def gauss_prob(x, avg=18.59, sigma=1.215, min_time=15, max_time=24):
     """
     Sets the basis for the gaussian probability distribution used for the Poisson draw in the models
 
@@ -48,37 +48,12 @@ def ruggedness_func(totals):
 # EMPIRICAL DATA FUNCTIONS
 
 
-def empirical_data_extraction(tracks_file, cam_name, line):
-    """
-    Uses the track data to get the crossing information for a track file
-
-        Args:
-            tracks_file (str): directory location of the pickle file with the tracks
-            cam_name (str): name of the camera as it appears in the directory
-            line (int): x value of the vertical line used to determine crossing
-        Returns:
-            rl (dict): gives the fish tag number with time(s) that it crossed the line
-                keys: fish tag number
-                values (list): list of times the fish crossed the line
-    """
-    tracks = pickle.load(open(tracks_file, "rb"))
-    lr = crossing_times(tracks, line, True)
-    rl = crossing_times(tracks, line, False)
-    for tag, lr_times in lr.items():
-        if tag in rl:
-            rl_times = rl[tag]
-            if min(lr_times) < min(rl_times) and max(lr_times) > max(rl_times):
-                rl.pop(tag)
-    return rl
-
-
-def empirical_tracks_processing(tracks_file, cam_name, t_vals, line, new_mid):
+def empirical_tracks_processing(tracks_file, t_vals, line, new_mid, leftright):
     """
     Processes the tracks to return aggregate totals of fish every time step
 
         Args:
             tracks_file (str): directory location of the pickle file with the tracks
-            cam_name (str): name of camera as it appears in the directory
             t_vals (numpy array): numpy linspace array of the time range with the respective time steps
             line (int): x value of the vertical line used to determine crossing
             new_mid (float): time location (hours) of the new middle of the data so the tracks line up
@@ -86,9 +61,11 @@ def empirical_tracks_processing(tracks_file, cam_name, t_vals, line, new_mid):
             raw_time_totals (list): same size as t_vals so that the ith entry corresponds to the total fish that have crossed after i time steps
             hist_data (list): list of the time steps where fish crossing with corresponding multiplicity
     """
-    rl = empirical_data_extraction(tracks_file, cam_name, line)
+    crossing_data = tracks_crossing_info(tracks_file, line, leftright)
     hist_data = []
-    times = np.array([np.mean(times) / 3600 for times in sorted(rl.values())])
+    times = np.array(
+        [np.mean(times) / 3600 for times in sorted(crossing_data.values())]
+    )
     times = times[times >= 15]
     times = [time - (times[round(len(times) / 2)] - new_mid) for time in times]
     for time in times:
@@ -105,11 +82,12 @@ def empirical_tracks_processing(tracks_file, cam_name, t_vals, line, new_mid):
     return raw_time_totals, hist_data
 
 
-cam_names = [
-    "cam01-bear_outflow",
-    "cam07-grass_outflow",
-    "cam09-trail_outflow",
-]
+cam_names = {
+    "cam01-bear_outflow": False,
+    "cam07-grass_outflow": False,
+    "cam0610-big_outflow": True,
+    "cam09-trail_outflow": False,
+}
 
 
 def empirical_data_return(t_vals, line, new_mid, cam_names=cam_names):
@@ -117,21 +95,21 @@ def empirical_data_return(t_vals, line, new_mid, cam_names=cam_names):
     Uses empirical_tracks_processing functionf for all tracks on 08-07 and 08-10 to return the data for the histogram and of the totals
 
         Args:
-            cam_names (list): list of all of the camera names to be considered
             line (int): x value of the vertical line to determine crossing
             new_mid (float): time value (hours) of the new middle of the data so the data all lines up
+            cam_names (dict): list of all of the camera names to be considered with corresponding bool to show if upstream is left to right or right to left
         Returns:
             raw_empirical_time_totals (list): list of the raw_time_totals lists for the tracks, as returned by empirical_tracks_processing
             empirical_hist_data (list): list of the hist_data as returned by the empirical_tracks_processsing function
     """
     raw_empirical_time_totals = []
     empirical_hist_data = []
-    for cam in cam_names:
+    for cam, leftright in cam_names.items():
         folder = f"/project/uwyo-0003/salmon-tlc/processing/tracks-with-true-times_06-18-2026/{cam}"
         tracks_files = sorted(glob.glob(os.path.join(folder, "*.pkl")))
         for tracks_file in [tracks_files[3], tracks_files[6]]:
             raw_time_totals, hist_data = empirical_tracks_processing(
-                tracks_file, cam, t_vals, line, new_mid
+                tracks_file, t_vals, line, new_mid, leftright
             )
             raw_empirical_time_totals.append(raw_time_totals)
             empirical_hist_data += hist_data
@@ -203,7 +181,7 @@ def asocial_data_return_true_size(t_vals):
     """
     raw_asocial_time_totals = []
     asocial_hist_data = []
-    for total_fish in [37, 51, 144, 57, 103, 159]:
+    for total_fish in [37, 51, 144, 57, 103, 159, 327, 685]:
         pois_nums = asocial_poisson_draw(t_vals, total_fish)
         time_totals = []
         hist_data = []
@@ -309,7 +287,7 @@ def social_data_return_true_size(t_vals, alpha, gamma):
     """
     raw_social_time_totals = []
     social_hist_data = []
-    for total_fish in [37, 51, 144, 57, 103, 159]:
+    for total_fish in [37, 51, 144, 57, 103, 159, 327, 685]:
         leaving_fish = poisson_pool_and_cascade(t_vals, total_fish, alpha, gamma)
         time_totals = []
         hist_data = []
