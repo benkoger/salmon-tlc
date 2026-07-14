@@ -226,7 +226,21 @@ def fish_group_distr_hist(
     plt.show()
 
 
-def make_lollipop_plots(proximity, save, total_plot=False, line=1250):
+def make_lollipop_plots(
+    proximity, downstream, save, total_plot=False, line=1250, cam_names=cam_names
+):
+    """
+    Makes lollipop plots of each fish/ group throughout the afternoon for each camera on the two big days (08/07 and 08/10)
+
+        Args:
+            proximity (float): specifies how close in time (seconds) a group is classified
+            downstream (bool): if True, the figure will also contain the group data for downstream data below the line y=0
+            save (bool): if True, the figure will be saved in the working directory
+            line (int): x-value of the vertical line to determine crossing of fish
+            cam_names (dict): keys give the names of the cameras, value are bools showing whether upstream is left to right (True) or right to left (False)
+        Returns:
+            Plots a figure with lollipop plots for each/fish group throughout the afternoon for each camera on 08/07 and 08/10
+    """
     dates = ["2025-08-07", "2025-08-10"]
     fig = plt.figure(figsize=(25, 15))
     num_rows = len(cam_names) * 2 if total_plot else len(cam_names)
@@ -236,10 +250,10 @@ def make_lollipop_plots(proximity, save, total_plot=False, line=1250):
         tracks_files = sorted(glob.glob(os.path.join(folder, "*.pkl")))
         for j, tracks_file in enumerate([tracks_files[3], tracks_files[6]]):
             crossing_data = tracks_crossing_info(tracks_file, line, leftright)
-            total = 0
-            total_fish = []
-            total_times = []
             if total_plot:
+                total = 0
+                total_fish = []
+                total_times = []
                 for tag, times in crossing_data.items():
                     total += 1
                     total_fish.append(total)
@@ -283,12 +297,49 @@ def make_lollipop_plots(proximity, save, total_plot=False, line=1250):
                     markerfmt="Dr",
                 )
             ax.set_xlim(15, 24)
-            ax.set_ylim(
-                0,
-            )
-            ax.set_title(f"Group sizes over time on {dates[j]} for {cam}")
+
+            if downstream:
+                downstream_data = tracks_crossing_info(tracks_file, line, not leftright)
+                groups = dbscan_time_groups(downstream_data, proximity)
+                group_fish = [fish for group in groups for fish in group]
+                singles = []
+                for tag in downstream_data:
+                    if tag not in group_fish:
+                        singles.append(tag)
+                group_times = []
+                for group in groups:
+                    group_times.append(
+                        [np.mean(downstream_data[group[0]]) / 3600, -len(group)]
+                    )
+                single_times = [
+                    np.mean(downstream_data[single]) / 3600 for single in singles
+                ]
+                group_times = np.array(group_times)
+                single_times = np.array(single_times)
+                if group_times.size > 0:
+                    ax.stem(
+                        group_times[:, 0],
+                        group_times[:, 1],
+                        basefmt=" ",
+                        linefmt="#CCB000",
+                    )
+                if single_times.size > 0:
+                    ax.stem(
+                        single_times,
+                        -np.ones(len(single_times)),
+                        basefmt=" ",
+                        linefmt="#009E73",
+                    )
+                ax.axhline(y=0, color="black")
+
+            name = cam.split("-")[-1].split("_")
+            full_name = ""
+            for word in name:
+                full_name += word.capitalize() + " "
+            # name = name.replace("_", " ").capitalize()
+            ax.set_title(f"Group sizes over time on {dates[j]} for {full_name}Camera")
             ax.set_xlabel("Time of day (hours)")
-            if i == 0:
+            if j == 0:
                 ax.set_ylabel("Group size")
     plt.tight_layout()
     if save:
