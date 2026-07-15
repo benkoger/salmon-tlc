@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
+from collections import defaultdict
 
 from cross_group_functions import dbscan_time_groups, tracks_crossing_info
 
@@ -44,7 +45,9 @@ cam_names = {
 }
 
 
-def group_size_box_plot_gaussian(proximity, ylog, save, line=1250, cam_names=cam_names):
+def group_size_box_plot_gaussian(
+    proximity, ylog, iterations, save, line=1250, cam_names=cam_names
+):
     """
     Returns a figure with a single plot where the x-axis gives the run size and the y axis gives the group size and there is a box plot at each of the run sizes for the empirical data as well as for data from a gaussian draw
 
@@ -85,16 +88,31 @@ def group_size_box_plot_gaussian(proximity, ylog, save, line=1250, cam_names=cam
             if not crossing_data:
                 gauss_points.append([])
                 continue
-            gauss_data = gaussian_sample_generator(crossing_data)
-            groups = dbscan_time_groups(gauss_data, proximity)
-            group_fish = [fish for group in groups for fish in group]
-            for tag in gauss_data:
-                if tag not in group_fish:
-                    groups.append([tag])
-            group_data = []
-            for group in groups:
-                group_data += [len(group)] * len(group)
-            gauss_points.append(group_data)
+
+            gaussian = defaultdict(list)
+            for _ in range(iterations):
+                gauss_data = gaussian_sample_generator(crossing_data)
+                groups = dbscan_time_groups(gauss_data, proximity)
+                group_fish = [fish for group in groups for fish in group]
+                for tag in gauss_data:
+                    if tag not in group_fish:
+                        groups.append([tag])
+                group_data = []
+                for group in groups:
+                    group_data += [len(group)] * len(group)
+                gaussian[np.median(group_data)].append(group_data)
+            mode = stats.mode(list(gaussian))
+            quarts = []
+            for data in gaussian[mode[0]]:
+                quarts.append(
+                    (
+                        3 * (np.percentile(data, 75) - np.percentile(data, 25))
+                        + 2 * (max(data) - min(data))
+                    )
+                    / 5
+                )
+            med = np.median(quarts)
+            gauss_points.append(gaussian[mode[0]][quarts.index(med)])
 
     lengths = np.array([len(vals) for vals in emp_points])
     values = sorted(zip(lengths, emp_points))
@@ -193,23 +211,19 @@ def interfish_emp_gauss(xlog, ylog, save, line=1250, cam_names=cam_names):
         for tracks_file in [tracks_files[3], tracks_files[6]]:
             crossing_data = tracks_crossing_info(tracks_file, line, leftright)
             all_tags = list(crossing_data)
-            for j, tag in enumerate(all_tags):
-                if j == len(all_tags) - 1:
-                    continue
+            for tag1, tag2 in zip(all_tags[:-1], all_tags[1:]):
                 distances = []
-                for time1 in crossing_data[tag]:
-                    for time2 in crossing_data[all_tags[j + 1]]:
+                for time1 in crossing_data[tag1]:
+                    for time2 in crossing_data[tag2]:
                         distances.append(abs(time1 - time2))
                 emp_distances.append(min(distances))
 
             gauss_data = gaussian_sample_generator(crossing_data)
             all_tags = list(gauss_data)
-            for j, tag in enumerate(all_tags):
-                if j == len(all_tags) - 1:
-                    continue
+            for tag1, tag2 in zip(all_tags[:-1], all_tags[1:]):
                 distances = []
-                for time1 in gauss_data[tag]:
-                    for time2 in gauss_data[all_tags[j + 1]]:
+                for time1 in gauss_data[tag1]:
+                    for time2 in gauss_data[tag2]:
                         distances.append(abs(time1 - time2))
                 gauss_distances.append(min(distances))
 
