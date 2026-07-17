@@ -71,6 +71,7 @@ def closest_all_fish_distances(
         else:
             ax.hist(close_dists[close_dists <= max_time], bins=num_bins)
             ax.set_xlim(0, max_time)
+        ax.set_title(f"Closest distances for {cam}")
         ax.set_xlabel("Distance (seconds)")
         ax.set_ylabel("Number of fish")
         if not all_distances:
@@ -107,7 +108,7 @@ def interfish_time_dist_plot(xlog, ylog, altogether, save, line=1250):
     """
     xscale = "log" if xlog else "linear"
     yscale = "log" if ylog else "linear"
-    fig = plt.figure(figsize=(8, 8))
+    fig = plt.figure(figsize=(8, 12))
     full_distances = []
     for i, (cam, leftright) in enumerate(cam_names.items()):
         folder = f"/project/uwyo-0003/salmon-tlc/processing/tracks-with-true-times_06-18-2026/{cam}"
@@ -115,13 +116,17 @@ def interfish_time_dist_plot(xlog, ylog, altogether, save, line=1250):
         interfish_distances = []
         for tracks_file in tracks_files:
             crossing_data = tracks_crossing_info(tracks_file, line, leftright)
-            all_tags = list(crossing_data)
-            for j, tag in enumerate(all_tags):
-                if j == len(all_tags) - 1:
-                    continue
+            # old way: this considers the neighbor as the next fish to enter the frame
+            # the issue is that the order in this case is not always the order of crossing
+            # all_tags = list(crossing_data)
+            # new way: this orders the fish based on their first crossing instance rather than their entrance in the frame
+            # note that an argument could be made to use the median or mean of the times instead of the first time
+            time_tag = {times[0]: tag for tag, times in crossing_data.items()}
+            all_tags = [time_tag[time] for time in sorted(time_tag)]
+            for tag1, tag2 in zip(all_tags[:-1], all_tags[1:]):
                 distances = []
-                for time1 in crossing_data[tag]:
-                    for time2 in crossing_data[all_tags[j + 1]]:
+                for time1 in crossing_data[tag1]:
+                    for time2 in crossing_data[tag2]:
                         distances.append(abs(time1 - time2))
                 interfish_distances.append(min(distances))
         if not interfish_distances:
