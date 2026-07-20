@@ -6,7 +6,7 @@ import numpy as np
 from scipy import stats
 from collections import defaultdict
 
-from cross_group_functions import dbscan_time_groups, tracks_crossing_info
+from cross_group_functions import tracks_crossing_info, dbscan_time_groups
 
 
 def gaussian_sample_generator(direction_data, min_val=54000, max_val=86400):
@@ -33,6 +33,25 @@ def gaussian_sample_generator(direction_data, min_val=54000, max_val=86400):
     random_samples = distribution.rvs(size=len(direction_times))
     random_sample_dict = {i: [time] for i, time in enumerate(sorted(random_samples))}
     return random_sample_dict
+
+
+def gaussian_time_sample_generator(time_vals, min_val=54000, max_val=86400):
+    """
+    Uses a list of time values to get random samples of the same size using a Gaussian distribution
+
+        Args:
+            time_vals (list): list of time values (for example, of crossing times)
+            min_val: minimum time value (in seconds) to consider for the distribution and random samples
+            max_vals: maximum time value (in seconds) to consider for the distribution and random samples
+        Returns:
+            random_samples (list): list of times (same size as time_vals) that were taken as a sample from a Gaussian distribution centered at the mean of time_vals and using the standard deviation of time_vals
+    """
+    mean_val = np.mean(time_vals)
+    std_dev = np.std(time_vals)
+    a, b = (min_val - mean_val) / std_dev, (max_val - mean_val) / std_dev
+    distribution = stats.truncnorm(a=a, b=b, loc=mean_val, scale=std_dev)
+    random_samples = distribution.rvs(size=len(time_vals))
+    return sorted(random_samples)
 
 
 cam_names = {
@@ -236,8 +255,13 @@ def interfish_emp_gauss(xlog, ylog, save, line=1250, cam_names=cam_names):
             # all_tags = list(crossing_data)
             # new way: considering fish in order of first instance of crossing
             # note that an argument could be made to use median or mean of the times for each fish instead of first crossing
-            time_tag = {times[0]: tag for tag, times in crossing_data.items()}
-            all_tags = [time_tag[time] for time in sorted(time_tags)]
+            time_tag = defaultdict(list)
+            for tag, times in crossing_data.items():
+                # note that np.median(times) or np.mean(times) could also be used
+                time_tag[times[0]].append(tag)
+            # The next line does not consider that multiple tags may have the same inital crossing time
+            # time_tag = {times[0]: tag for tag, times in crossing_data.items()}
+            all_tags = [tag for time in sorted(time_tag) for tag in time_tag[time]]
             for tag1, tag2 in zip(all_tags[:-1], all_tags[1:]):
                 distances = []
                 for time1 in crossing_data[tag1]:
@@ -321,7 +345,10 @@ def fraction_under_thresh(iterations, save, line=1250, cam_names=cam_names):
             Plots a figure with subplots for each of the thresholds, showing how well the empirical and Gaussian data align.
     """
     range_index = round(0.05 * iterations / 2)
-    prox_points = {5 * 2**i: [[], [[], [], []]] for i in range(10)}
+    # prox_points = {5 * 2**i: [[], [[], [], []]] for i in range(10)}
+    prox_points = {
+        i: [[], [[], [], []]] for i in [5, 10, 20, 30, 45, 60, 120, 300, 600, 1800]
+    }
     for cam, leftright in cam_names.items():
         folder = f"/project/uwyo-0003/salmon-tlc/processing/tracks-with-true-times_06-18-2026/{cam}"
         tracks_files = sorted(glob.glob(os.path.join(folder, "*.pkl")))
@@ -334,9 +361,13 @@ def fraction_under_thresh(iterations, save, line=1250, cam_names=cam_names):
                     pop_tags.append(tag)
             for tag in pop_tags:
                 crossing_data.pop(tag)
-            # np.mean(timers) or np.median(times) could also be used
-            time_tag = {times[0]: tag for tag, times in crossing_data.items()}
-            all_tags = [time_tag[time] for time in sorted(time_tag)]
+            time_tag = defaultdict(list)
+            for tag, times in crossing_data.items():
+                # np.mean(timers) or np.median(times) could also be used
+                time_tag[times[0]].append(tag)
+            # This next line doesn't work well because there may be multiple fish with the same inital crossing time
+            # time_tag = {times[0]: tag for tag, times in crossing_data.items()}
+            all_tags = [tag for time in sorted(time_tag) for tag in time_tag[time]]
             distances = []
             for tag1, tag2 in zip(all_tags[:-1], all_tags[1:]):
                 dists = []
@@ -374,9 +405,9 @@ def fraction_under_thresh(iterations, save, line=1250, cam_names=cam_names):
     for i, (prox, (e_points, g_points)) in enumerate(prox_points.items()):
         ax = fig.add_subplot(2, int(len(prox_points) / 2), i + 1)
         e_points = np.array(sorted(e_points))
-        ax.plot(e_points[:, 0], e_points[:, 1])
+        ax.plot(e_points[:, 0], e_points[:, 1], label="Empirical data")
         g_points_ = np.array(sorted(g_points[0]))
-        ax.plot(g_points_[:, 0], g_points_[:, 1])
+        ax.plot(g_points_[:, 0], g_points_[:, 1], label="Gaussian sample median")
         lower = np.array(sorted(g_points[1]))
         upper = np.array(sorted(g_points[2]))
         ax.fill_between(
@@ -386,7 +417,111 @@ def fraction_under_thresh(iterations, save, line=1250, cam_names=cam_names):
         ax.set_xlabel("Run size")
         ax.set_ylabel("Fraction of distances under threshold")
         ax.set_ylim(0, 1)
+        ax.legend()
     plt.tight_layout()
     if save:
         plt.savefig(f"interfish_fracs-gauss_emp-{iterations}.jpg", dpi=500)
+    plt.show()
+
+
+cam_names = {
+    "cam01-bear_outflow": False,
+    "cam07-grass_outflow": False,
+    "cam09-trail_outflow": False,
+    "cam0610-big_outflow": True,
+}
+
+
+def group_fraction_under_thresh(
+    iterations, proximity, save, line=1250, cam_names=cam_names, min_time=54000
+):
+    """
+    Returns a figure showing the fraction of inter-group distances for both the empirical data and Gaussian samples for various proximities
+
+        Args:
+            iterations (int): number of times to repeat the Gaussian sampling
+            proximity (float): number of seconds for threshold for grouping
+            save (bool): if True, the figure will be saved in the working directory
+            line (int): x-value of the verical line to be used for crossing
+            cam_names (dict): keys are the camera names and values are bools. If True, upstream is left to right. If False, upstream is right to left
+            min_time (int): time (seconds) of the lowest value to consider
+        Returns:
+            Plots a figure with subplots for several different proximities to compare the empriical data and the Gaussian sampling
+    """
+    prox_points = {
+        i: [[], [[], [], []]] for i in [20, 30, 45, 60, 80, 100, 120, 300, 600, 1800]
+    }
+    range_index = round(0.05 * iterations / 2)
+    for i, (cam, leftright) in enumerate(cam_names.items()):
+        folder = f"/project/uwyo-0003/salmon-tlc/processing/tracks-with-true-times_06-18-2026/{cam}"
+        tracks_files = sorted(glob.glob(os.path.join(folder, "*.pkl")))
+        for j, tracks_file in enumerate([tracks_files[3], tracks_files[6]]):
+            crossing_data = tracks_crossing_info(tracks_file, 1250, leftright)
+            pop_tags = []
+            for tag, times in crossing_data.items():
+                if np.mean(times) < min_time:
+                    pop_tags.append(tag)
+            for tag in pop_tags:
+                crossing_data.pop(tag)
+            groups = dbscan_time_groups(crossing_data, proximity)
+            group_fish = [fish for group in groups for fish in group]
+            for tag in crossing_data:
+                if tag not in group_fish:
+                    groups.append([tag])
+            emp_times = []
+            for group in groups:
+                raw_times = []
+                for tag in group:
+                    for time in crossing_data[tag]:
+                        raw_times.append(time)
+                # emp_times.append(sorted(raw_times)[0])
+                emp_times.append(np.median(raw_times))
+            emp_times = sorted(emp_times)
+            distances = np.array(
+                [t2 - t1 for t1, t2, in zip(emp_times[:-1], emp_times[1:])]
+            )
+
+            gauss_distances = []
+            for _ in range(iterations):
+                gauss_times = gaussian_time_sample_generator(
+                    emp_times, min_val=min_time
+                )
+                dists = np.array(
+                    [t2 - t1 for t1, t2, in zip(gauss_times[:-1], gauss_times[1:])]
+                )
+                gauss_distances.append(dists)
+
+            len1 = len(distances)
+            len2 = len(gauss_distances[0])
+            for prox, (e_points, g_points) in prox_points.items():
+                e_points.append([len1, len(distances[distances < prox]) / len1])
+
+                g_prox_fracs = sorted(
+                    [len(g_dists[g_dists < prox]) / len2 for g_dists in gauss_distances]
+                )
+                g_points[0].append([len2, np.median(g_prox_fracs)])
+                g_points[1].append([len2, g_prox_fracs[range_index]])
+                g_points[2].append([len2, g_prox_fracs[-range_index]])
+
+    fig = plt.figure(figsize=(20, 10))
+
+    for i, (prox, (e_points, g_points)) in enumerate(prox_points.items()):
+        ax = fig.add_subplot(2, int(len(prox_points) / 2), i + 1)
+        e_points = np.array(sorted(e_points))
+        ax.plot(e_points[:, 0], e_points[:, 1])
+        g_points_ = np.array(sorted(g_points[0]))
+        ax.plot(g_points_[:, 0], g_points_[:, 1])
+        lower = np.array(sorted(g_points[1]))
+        upper = np.array(sorted(g_points[2]))
+        ax.fill_between(
+            g_points_[:, 0], lower[:, 1], upper[:, 1], alpha=0.3, color="tab:orange"
+        )
+        ax.set_title(f"{prox}-second threshold")
+        ax.set_xlabel("Number of groups")
+        ax.set_ylabel("Fraction of distances under threshold")
+        ax.set_ylim(0, 1)
+    fig.suptitle(f"{proximity}-second threshold for grouping")
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"intergroup-emp_gauss-{proximity}-{iterations}.jpg", dpi=500)
     plt.show()
