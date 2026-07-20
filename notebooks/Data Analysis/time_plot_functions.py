@@ -101,6 +101,7 @@ def interfish_time_dist_plot(xlog, ylog, altogether, save, line=1250):
         Args:
             xlog (bool): if True, the scale for the x-axis will be logarithmic
             ylog (bool): if True, the scale for the y-axis will be logarithmic
+            altogether (bool): if False, the interfish distances will be plot in separate subplots for each camera. If True, the distances will all be plot in the same subplot
             save (bool):if True, the figure will be saved to the current directory
             line (int): location of the vertical line to determin crossing
         Returns:
@@ -120,9 +121,13 @@ def interfish_time_dist_plot(xlog, ylog, altogether, save, line=1250):
             # the issue is that the order in this case is not always the order of crossing
             # all_tags = list(crossing_data)
             # new way: this orders the fish based on their first crossing instance rather than their entrance in the frame
-            # note that an argument could be made to use the median or mean of the times instead of the first time
-            time_tag = {times[0]: tag for tag, times in crossing_data.items()}
-            all_tags = [time_tag[time] for time in sorted(time_tag)]
+            time_tag = defaultdict(list)
+            for tag, times in crossing_data.items():
+                # note that np.median(times) or np.mean(times) could also be used
+                time_tag[times[0]].append(tag)
+            # the next line does not consider whether multiple tags have the same inital crossing time
+            # time_tag = {times[0]: tag for tag, times in crossing_data.items()}
+            all_tags = [tag for time in sorted(time_tag) for tag in time_tag[time]]
             for tag1, tag2 in zip(all_tags[:-1], all_tags[1:]):
                 distances = []
                 for time1 in crossing_data[tag1]:
@@ -283,9 +288,8 @@ def make_lollipop_plots(
                 )
             single_times = []
             for single in singles:
-                single_times.append([np.mean(crossing_data[single]) / 3600, 1])
+                single_times.append(np.mean(crossing_data[single]) / 3600)
             group_times = np.array(group_times)
-            single_times = np.array(single_times)
             ax = fig.add_subplot(num_rows, 2, 1 + j + cam_repeat * i)
             if group_times.size > 0:
                 ax.stem(
@@ -293,10 +297,10 @@ def make_lollipop_plots(
                     group_times[:, 1],
                     basefmt=" ",
                 )
-            if single_times.size > 0:
+            if single_times:
                 ax.stem(
-                    single_times[:, 0],
-                    single_times[:, 1],
+                    single_times,
+                    np.ones(len(single_times)),
                     basefmt=" ",
                     linefmt="tab:orange",
                     markerfmt="Dr",
@@ -464,4 +468,65 @@ def empirical_totals_plot(time_step, save, line=1250, new_mid=18.5):
     plt.tight_layout()
     if save:
         plt.savefig(f"empirical_totals-days_and_cams-{time_step}.jpg", dpi=500)
+    plt.show()
+
+
+def intergroup_time_hist(xlog, ylog, proximity, save, line=1250, cam_names=cam_names):
+    """
+    Plots a figure with subplots for each camera, showing the distribution of the distances from the median of one group to that of the next (in time)
+
+        Args:
+            xlog (bool): if True, the x-axis will have a log scale. If False, the x-axis will have a linear scale.
+            ylog (bool): if True, the y-axis will have a log scale. If False, the x-axis will have a linear scale.
+            proximity (float): threshold (in seconds) for groups
+            save (bool): if True, the figure will be saved in the working directory
+            line (int): x-value of the vertial line used to determine crossing
+            cam_names (dict): keys give the names of the cameras. Values are bools, with True showing that upstream is left to right and False showing that upstream is right to left
+
+        Returns:
+            Plots a figure with a subplot for each camera in cam_names, giving the number of groups at each distance.
+    """
+    xscale = "log" if xlog else "linear"
+    yscale = "log" if ylog else "linear"
+    fig = plt.figure(figsize=(6, 12))
+    for i, (cam, leftright) in enumerate(cam_names.items()):
+        folder = f"/project/uwyo-0003/salmon-tlc/processing/tracks-with-true-times_06-18-2026/{cam}"
+        tracks_files = sorted(glob.glob(os.path.join(folder, "*.pkl")))
+        distances = []
+        for tracks_file in [tracks_files[3], tracks_files[6]]:
+            crossing_data = tracks_crossing_info(tracks_file, line, leftright)
+            pop_tags = []
+            for tag, times in crossing_data.items():
+                if np.mean(times) < 54000:
+                    pop_tags.append(tag)
+            for tag in pop_tags:
+                crossing_data.pop(tag)
+            groups = dbscan_time_groups(crossing_data, proximity)
+            group_fish = [tag for group in groups for tag in group]
+            for tag in crossing_data:
+                if tag not in group_fish:
+                    groups.append([tag])
+            times = []
+            for group in groups:
+                raw_times = []
+                for tag in group:
+                    for time in crossing_data[tag]:
+                        raw_times.append(time)
+                times.append(np.median(raw_times))
+            distances += [t2 - t1 for t1, t2 in zip(times[:-1], times[1:])]
+        distances = np.array(distances)
+        ax = fig.add_subplot(len(cam_names), 1, i + 1, xscale=xscale, yscale=yscale)
+        if xlog:
+            _, bins = np.histogram(distances[distances > 0])
+            bins = np.logspace(np.log10(bins[0]), np.log10(bins[-1]), len(bins))
+            ax.hist(distances[distances > 0], bins=bins)
+            ax.set_xlim(1, 1.2 * 10**4)
+        else:
+            ax.hist(distances[distances <= 200])
+        ax.set_title(f"{cam}: distances from the median of one group to the next")
+        ax.set_xlabel("Distance (seconds)")
+        ax.set_ylabel("Number of groups")
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"intergroup-hist_{xscale}-{yscale}-scale.jpg", dpi=500)
     plt.show()
