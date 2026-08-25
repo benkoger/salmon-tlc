@@ -449,7 +449,8 @@ def group_fraction_under_thresh(
             Plots a figure with subplots for several different proximities to compare the empriical data and the Gaussian sampling
     """
     prox_points = {
-        i: [[], [[], [], []]] for i in [20, 30, 45, 60, 80, 100, 120, 300, 600, 1800]
+        i: [[], [[], [], []]]
+        for i in [5, 10, 20, 30, 45, 60, 80, 100, 120, 300, 600, 1800]
     }
     range_index = round(0.05 * iterations / 2)
     for i, (cam, leftright) in enumerate(cam_names.items()):
