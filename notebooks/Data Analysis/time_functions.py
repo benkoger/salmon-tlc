@@ -24,10 +24,10 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
             output (list): list of times in seconds, with index + 1 corresponding to the frame number
     """
     vid_split = video_file.split("/")
-    file_dir = f"/project/uwyo-0003/salmon-tlc/processing/time-stamp-extraction_07-08-2026/{vid_split[5]}/{vid_split[7]}"
+    file_dir = f"/project/uwyo-0003/salmon-tlc/processing/time-stamp-extraction_07-16-2026/{vid_split[5]}/{vid_split[7]}"
     file_path = os.path.join(file_dir, f"{vid_split[-1][:-4]}-extracted_times.pkl")
     if os.path.exists(file_path):
-        return
+        return [], []
 
     crop_dict = {
         "20250804": [1425, 1511],  # used to be 1426, 1510
@@ -106,7 +106,10 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
             diff = cv2.absdiff(frame, old_frame)
             sim_score = (diff > 10).mean()
             if sim_score < 0.00007:  # used to be 0.00005
-                output.append(3600 * time.hour + 60 * time.minute + time.second)
+                if time.hour == 0 and time.minute == 0 and time.second == 0:
+                    output.append(86400)
+                else:
+                    output.append(3600 * time.hour + 60 * time.minute + time.second)
                 old_frame = frame
                 continue
 
@@ -157,7 +160,7 @@ def time_converter(video_file, x_fac=1.4, y_fac=1.4):
 
     with open(file_path, "wb") as f:
         pickle.dump(new_output, f)
-    return  # new_output, output
+    return new_output, output
 
 
 def get_tracks_folder(date, cam_name):
